@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SENTRY // LLM Firewall</title>
+<style>
+:root{
+  --bg:#070d16;
+  --panel:#0c1826;
+  --line:#1a2c40;
+  --text:#c9d8e6;
+  --dim:#57718c;
+  --safe:#3d9cff;
+  --alert:#ff4d4d;
+  --mono:'JetBrains Mono','Courier New',monospace;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--mono);height:100vh;display:flex;flex-direction:column;
+}
+header{
+  padding:14px 20px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+}
+header .brand{font-size:14px;letter-spacing:3px;color:var(--safe);}
+header .brand::before{content:"● ";}
+header .sub{font-size:11px;color:var(--dim);}
+#log{
+  flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:10px;
+}
+.msg{max-width:70%;padding:10px 14px;border-radius:2px;font-size:13px;line-height:1.5;white-space:pre-wrap;}
+.user{align-self:flex-end;background:#14201a;border:1px solid var(--line);}
+.ai{align-self:flex-start;background:var(--panel);border-left:2px solid var(--safe);}
+.blocked{align-self:flex-start;background:#1a0f0f;border-left:2px solid var(--alert);color:var(--alert);}
+.blocked .tag{font-size:10px;letter-spacing:2px;color:var(--alert);display:block;margin-bottom:6px;}
+#inputbar{
+  display:flex;gap:10px;padding:16px 20px;border-top:1px solid var(--line);
+}
+#apikey,#prompt{
+  background:#0c110e;border:1px solid var(--line);color:var(--text);
+  padding:10px;font-family:var(--mono);font-size:12px;border-radius:2px;
+}
+#apikey{width:220px;}
+#prompt{flex:1;}
+button{
+  background:var(--safe);color:#04150c;border:none;padding:0 18px;
+  font-family:var(--mono);font-weight:bold;letter-spacing:1px;cursor:pointer;border-radius:2px;
+}
+button:hover{opacity:0.85;}
+::placeholder{color:var(--dim);}
+#log::-webkit-scrollbar{width:6px;}
+#log::-webkit-scrollbar-thumb{background:var(--line);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">SENTRY</div>
+  <div class="sub">LLM injection firewall — regex + base64 heuristics</div>
+</header>
+
+<div id="log"></div>
+
+<div id="inputbar">
+  <input id="prompt" type="text" placeholder="Type a message..." onkeydown="if(event.key==='Enter')send()" />
+  <button onclick="send()">SEND</button>
+</div>
+
+<script>
+const log = document.getElementById('log');
+
+function addMsg(text, cls, tag){
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  if(tag){
+    const t = document.createElement('span');
+    t.className = 'tag';
+    t.textContent = tag;
+    div.appendChild(t);
+  }
+  div.appendChild(document.createTextNode(text));
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function send(){
+  const apiKey = "0f3ac7670";
+  const promptEl = document.getElementById('prompt');
+  const prompt = promptEl.value.trim();
+  if(!prompt) return;
+
+  addMsg(prompt, 'user');
+  promptEl.value = '';
+
+  try{
+    const res = await fetch('/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({api_key: apiKey, prompt})
+    });
+    const data = await res.json();
+
+    if(data.blocked){
+      addMsg('Detections: ' + data.detections.join(', '), 'blocked', '⛔ BLOCKED — LOGGED TO WAZUH');
+    } else {
+      addMsg(data.reply, 'ai');
+    }
+  } catch(e){
+    addMsg('Connection error: ' + e, 'blocked', '⚠ ERROR');
+  }
+}
+</script>
+
+</body>
+</html>
